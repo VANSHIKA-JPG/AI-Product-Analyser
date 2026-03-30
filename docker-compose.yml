@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - db_data:/app/instance
+      - ./models:/app/models
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    environment:
+      - API_BASE=http://api:5000/api
+    restart: unless-stopped
+
+volumes:
+  db_data:

@@ -1,0 +1,55 @@
+# ===== FastAPI Core =====
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+gunicorn==23.0.0
+
+# ===== Database =====
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# ===== Authentication =====
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# ===== Validation =====
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# ===== Database (async drivers) =====
+aiosqlite>=0.19.0    # SQLite async (dev fallback)
+
+# ===== HTTP & Scraping =====
+httpx==0.28.1
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.3.0
+fake-useragent==2.0.3
+
+# ===== ML / NLP =====
+scikit-learn==1.6.1
+pandas==2.2.3
+numpy==2.2.3
+joblib==1.4.2
+
+# ===== Transformers / NLP =====
+transformers==4.47.1
+torch>=2.6.0
+vaderSentiment==3.3.2
+
+# ===== spaCy & NLTK =====
+spacy>=3.7.4
+nltk==3.9.1
+
+# ===== AI Summarization =====
+google-generativeai==0.8.4
+
+# ===== Utilities =====
+python-dotenv==1.0.1
+python-multipart==0.0.20
+
+# ===== Testing =====
+pytest==8.3.4
+pytest-asyncio==0.24.0
