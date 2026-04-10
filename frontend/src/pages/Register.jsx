@@ -17,7 +17,12 @@ export default function Register() {
       localStorage.setItem('token', data.access_token)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed')
+      const d = err.response?.data?.detail;
+      if (Array.isArray(d)) {
+        setError(d.map(e => e.msg).join(' • '));
+      } else {
+        setError(d || 'Registration failed');
+      }
     } finally {
       setLoading(false)
     }

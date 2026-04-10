@@ -55,11 +55,20 @@ export default function Home() {
               id="product-url-input"
               type="url"
               className="input flex-1 text-base"
-              placeholder="https://www.amazon.in/dp/XXXXXXXXXX"
+              placeholder="https://www.amazon.in/dp/B0XXXXXXXX/"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}
             />
+            {/* <input
+              id="product-url-input"
+              type="url"
+              className="input flex-1 text-base"
+              placeholder="https://www.amazon.in/HaRvic-Tumbler-Stainless-Insulated-Travel/dp/B0XXXXXXXX/"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={loading}
+            /> */}
             <button
               id="analyse-btn"
               type="submit"

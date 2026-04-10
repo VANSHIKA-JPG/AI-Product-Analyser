@@ -151,6 +151,7 @@ class FakeReviewDetector:
     # ── Private ─────────────────────────────────────────────────────────
 
     def _ml_predict(self, text: str, rating, verified) -> FakeResult:
+        print("ML MODEL IS WORKING")
         proc = preprocess_for_ml(text)
         tfidf = self.vectorizer.transform([proc])
         meta = csr_matrix(self._meta_features(pd.Series([text])))
@@ -163,9 +164,11 @@ class FakeReviewDetector:
             is_suspicious=fake_prob > self.THRESHOLD,
             confidence=round(float(max(proba)), 4),
             risk_factors=factors,
+        
         )
 
     def _heuristic(self, text: str, rating, verified) -> FakeResult:
+        print("HEURISTIC MODEL IS WORKING")
         score = 0.0
         factors = []
         feats = extract_text_features(text)

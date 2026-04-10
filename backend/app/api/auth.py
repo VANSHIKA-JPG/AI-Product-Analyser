@@ -17,15 +17,20 @@ from config import get_settings
 
 settings = get_settings()
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+import bcrypt
 
 def hash_password(password: str) -> str:
-    return pwd_ctx.hash(password)
-
+    # Modern bcrypt requires bytes, we encode the string to utf-8
+    salt = bcrypt.gensalt()
+    pwd_bytes = password.encode('utf-8')
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_ctx.verify(plain, hashed)
+    # Compare raw bytes
+    return bcrypt.checkpw(
+        plain.encode('utf-8'),
+        hashed.encode('utf-8')
+    )
 
 
 def create_access_token(user_id: int) -> str:

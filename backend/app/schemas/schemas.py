@@ -12,7 +12,17 @@ from pydantic import BaseModel, EmailStr, HttpUrl, Field, field_validator
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=80)
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=4)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, v):
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least 1 number")
+        # Check for special characters (anything not alphanumeric)
+        if not any(not char.isalnum() for char in v):
+            raise ValueError("Password must contain at least 1 special character")
+        return v
 
 
 class UserLogin(BaseModel):
