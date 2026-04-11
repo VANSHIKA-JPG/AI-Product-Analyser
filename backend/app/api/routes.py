@@ -17,7 +17,7 @@ from app.schemas.schemas import (
     HistoryResponse, HistoryItemSchema,
 )
 from app.scraper.amazon_scraper import AmazonScraper, is_valid_amazon_url
-from app.ml.sentiment import analyze_product_reviews, analyze_review
+from app.ml.sentiment import analyze_product_reviews, analyze_review, init_sentiment_classifier
 from app.ml.fake_review import FakeReviewDetector
 from app.ml.summarizer import ProductSummarizer, analyze_price_value, compare_products
 from app.api.deps import get_optional_user
@@ -51,6 +51,17 @@ def get_summarizer() -> ProductSummarizer:
             model_name=settings.GEMINI_MODEL,
         )
     return _summarizer
+
+
+def startup_ml_models():
+    """Load all ML models once at server startup. Called from main.py lifespan."""
+    # Fake review detector
+    get_detector()
+    # Sentiment classifier
+    init_sentiment_classifier(
+        model_path=settings.SENTIMENT_MODEL_PATH,
+        vectorizer_path=settings.SENTIMENT_VECTORIZER_PATH,
+    )
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────

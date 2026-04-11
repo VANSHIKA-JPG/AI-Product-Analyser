@@ -1,21 +1,24 @@
 """
 Dual-engine Sentiment Analysis:
-  1. Hugging Face Transformers (DistilBERT) — accurate, deep learning
-  2. VADER — fast, rule-based, excellent for review text
+  1. Trained ML Classifier (TF-IDF + Logistic Regression) — primary engine
+     Trained on multi-domain Amazon reviews (katossky/multi-domain-sentiment)
+  2. VADER — fast rule-based, used as secondary signal + fallback
 
-The engine used is controlled by USE_TRANSFORMER_SENTIMENT in config.
+If .pkl models are not found, falls back gracefully to VADER-only mode.
 """
 
+import os
 import logging
 from dataclasses import dataclass, field
 from functools import lru_cache
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from app.ml.preprocessor import clean_text
+from app.ml.preprocessor import clean_text, preprocess_for_ml
 
 logger = logging.getLogger("SentimentAnalyser")
 
-# Aspect keywords for 7-dimension aspect-based analysis
+
+# ── Aspect keywords for 7-dimension aspect-based analysis ─────────────────────
 ASPECT_KEYWORDS = {
     "quality":     ["quality", "build", "material", "sturdy", "durable", "solid", "cheap", "fragile"],
     "value":       ["price", "value", "worth", "money", "expensive", "affordable", "bargain", "overpriced"],
@@ -26,94 +29,140 @@ ASPECT_KEYWORDS = {
     "service":     ["delivery", "service", "support", "customer", "return", "refund", "shipping", "packaging"],
 }
 
-# VADER singleton
+
+# ── VADER singleton ────────────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def _get_vader():
     return SentimentIntensityAnalyzer()
 
 
-# Transformer pipeline (lazy-loaded only when enabled)
-_transformer_pipeline = None
-_transformer_loaded = False
+# ── ML Sentiment Classifier ────────────────────────────────────────────────────
+class SentimentClassifier:
+    """
+    TF-IDF + Logistic Regression sentiment classifier.
+    Trained on the multi-domain Amazon review dataset.
+    Predicts positive (1) or negative (0) with confidence.
+    """
 
+    def __init__(self, model_path: str, vectorizer_path: str):
+        self.model = None
+        self.vectorizer = None
+        self.loaded = False
+        self._load(model_path, vectorizer_path)
 
-def _get_transformer():
-    global _transformer_pipeline, _transformer_loaded
-    if not _transformer_loaded:
+    def _load(self, model_path: str, vectorizer_path: str):
         try:
-            from transformers import pipeline
-            _transformer_pipeline = pipeline(
-                "sentiment-analysis",
-                model="distilbert-base-uncased-finetuned-sst-2-english",
-                truncation=True,
-                max_length=512,
-            )
-            logger.info("DistilBERT sentiment pipeline loaded")
+            import joblib
+            if os.path.exists(model_path) and os.path.exists(vectorizer_path):
+                self.model      = joblib.load(model_path)
+                self.vectorizer = joblib.load(vectorizer_path)
+                self.loaded     = True
+                logger.info("✅ ML Sentiment Classifier loaded from disk")
+            else:
+                logger.warning(
+                    "Sentiment .pkl files not found — falling back to VADER-only mode. "
+                    "Run: python train_sentiment_model.py to generate them."
+                )
         except Exception as e:
-            logger.warning(f"Could not load transformer pipeline: {e}")
-            _transformer_pipeline = None
-        _transformer_loaded = True
-    return _transformer_pipeline
+            logger.error(f"Failed to load sentiment model: {e}")
+
+    def predict(self, text: str) -> dict:
+        """
+        Predict sentiment for a single review text.
+        Returns: {'label': 'positive'/'negative', 'score': float, 'confidence': float}
+        """
+        if not self.loaded:
+            return None   # Caller falls back to VADER
+        try:
+            processed = preprocess_for_ml(text)
+            tfidf = self.vectorizer.transform([processed])
+            proba = self.model.predict_proba(tfidf)[0]
+            is_positive = proba[1] > 0.5
+            # Convert to -1 to +1 scale (same as VADER compound) for easy combination
+            score = float(proba[1] * 2 - 1)   # maps [0,1] → [-1,+1]
+            return {
+                "label":      "positive" if is_positive else "negative",
+                "score":      round(score, 4),
+                "confidence": round(float(max(proba)), 4),
+            }
+        except Exception as e:
+            logger.warning(f"ML sentiment prediction failed: {e}")
+            return None
 
 
+# ── Singleton classifier (lazy-loaded on first use) ───────────────────────────
+_sentiment_clf: SentimentClassifier | None = None
+
+
+def init_sentiment_classifier(model_path: str, vectorizer_path: str):
+    """Called once from routes.py at startup with paths from config."""
+    global _sentiment_clf
+    _sentiment_clf = SentimentClassifier(model_path, vectorizer_path)
+
+
+def _get_classifier() -> SentimentClassifier | None:
+    return _sentiment_clf
+
+
+# ── Data classes ───────────────────────────────────────────────────────────────
 @dataclass
 class SentimentResult:
-    vader_score: float          # -1.0 to 1.0
-    combined_score: float       # weighted average
-    label: str                  # positive / negative / neutral
-    confidence: float           # 0.0 to 1.0
-    transformer_label: str = "" # from DistilBERT if enabled
+    vader_score:       float   # -1.0 to 1.0
+    combined_score:    float   # weighted average of ML + VADER
+    label:             str     # positive / negative / neutral
+    confidence:        float   # 0.0 to 1.0
+    ml_label:          str = ""   # from trained classifier
+    ml_score:          float = 0.0
 
 
 @dataclass
 class ProductSentiment:
-    overall_score: float
-    positive_pct: float
-    negative_pct: float
-    neutral_pct: float
-    total_reviews: int
+    overall_score:     float
+    positive_pct:      float
+    negative_pct:      float
+    neutral_pct:       float
+    total_reviews:     int
     average_confidence: float
     aspect_sentiments: dict = field(default_factory=dict)
     score_distribution: dict = field(default_factory=dict)
 
 
+# ── Core analysis functions ────────────────────────────────────────────────────
+
 def analyze_review(text: str, use_transformer: bool = False) -> SentimentResult:
     """
-    Analyse sentiment of a single review text.
-
-    Args:
-        text: Raw review text.
-        use_transformer: If True, also run DistilBERT.
-
-    Returns:
-        SentimentResult with scores from both engines.
+    Analyse sentiment of a single review.
+    Primary engine: Trained ML Classifier (if .pkl loaded)
+    Secondary engine: VADER
+    Combined score: 0.65 * ML + 0.35 * VADER  (ML-first, VADER as signal)
+    Falls back to VADER-only if classifier not loaded.
     """
     text = clean_text(text)
     if not text:
         return SentimentResult(0.0, 0.0, "neutral", 0.0)
 
+    # VADER score (always computed)
     vader = _get_vader()
-    vader_scores = vader.polarity_scores(text)
-    vader_compound = vader_scores["compound"]
+    vader_compound = vader.polarity_scores(text)["compound"]
 
-    transformer_label = ""
-    combined = vader_compound
+    # ML Classifier score
+    clf = _get_classifier()
+    ml_result = clf.predict(text) if clf else None
 
-    if use_transformer:
-        pipe = _get_transformer()
-        if pipe:
-            try:
-                result = pipe(text[:512])[0]
-                # POSITIVE → positive score, NEGATIVE → negative
-                transformer_score = result["score"]  # 0.0 to 1.0
-                if result["label"] == "NEGATIVE":
-                    transformer_score = -transformer_score
-                combined = 0.5 * vader_compound + 0.5 * transformer_score
-                transformer_label = result["label"].lower()
-            except Exception as e:
-                logger.warning(f"Transformer inference failed: {e}")
+    if ml_result:
+        # Weighted combination: 65% ML, 35% VADER
+        combined   = 0.65 * ml_result["score"] + 0.35 * vader_compound
+        ml_label   = ml_result["label"]
+        ml_score   = ml_result["score"]
+        confidence = ml_result["confidence"]
+    else:
+        # VADER-only fallback
+        combined   = vader_compound
+        ml_label   = ""
+        ml_score   = 0.0
+        confidence = min(abs(vader_compound), 1.0)
 
-    # Label
+    # Final label
     if combined >= 0.05:
         label = "positive"
     elif combined <= -0.05:
@@ -121,14 +170,13 @@ def analyze_review(text: str, use_transformer: bool = False) -> SentimentResult:
     else:
         label = "neutral"
 
-    confidence = min(abs(combined), 1.0)
-
     return SentimentResult(
         vader_score=round(vader_compound, 4),
         combined_score=round(combined, 4),
         label=label,
         confidence=round(confidence, 3),
-        transformer_label=transformer_label,
+        ml_label=ml_label,
+        ml_score=round(ml_score, 4),
     )
 
 
@@ -138,10 +186,7 @@ def analyze_product_reviews(
 ) -> ProductSentiment:
     """
     Aggregate sentiment across all product reviews.
-
-    Args:
-        reviews: List of dicts with a 'text' key.
-        use_transformer: Whether to use DistilBERT.
+    Returns positive/negative/neutral percentages + detailed breakdown.
     """
     if not reviews:
         return ProductSentiment(0.0, 0.0, 0.0, 0.0, 0, 0.0)
@@ -159,9 +204,9 @@ def analyze_product_reviews(
         else:
             neu += 1
 
-    total = len(results)
+    total     = len(results)
     avg_score = sum(r.combined_score for r in results) / total
-    avg_conf = sum(r.confidence for r in results) / total
+    avg_conf  = sum(r.confidence for r in results) / total
 
     distribution = {
         "very_negative": sum(1 for r in results if r.combined_score <= -0.5),
@@ -173,7 +218,9 @@ def analyze_product_reviews(
 
     aspect_sentiments = _aspect_analysis(reviews)
 
-    logger.info(f"Analyzed {total} reviews — +{pos} -{neg} ~{neu}")
+    clf = _get_classifier()
+    mode = "ML Classifier + VADER" if (clf and clf.loaded) else "VADER only"
+    logger.info(f"Analyzed {total} reviews [{mode}] — +{pos} -{neg} ~{neu}")
 
     return ProductSentiment(
         overall_score=round(avg_score, 4),
@@ -188,7 +235,7 @@ def analyze_product_reviews(
 
 
 def _aspect_analysis(reviews: list[dict]) -> dict:
-    """Compute per-aspect sentiment scores."""
+    """Compute per-aspect sentiment scores using keyword matching."""
     scores: dict = {asp: [] for asp in ASPECT_KEYWORDS}
 
     for rev in reviews:
@@ -200,7 +247,7 @@ def _aspect_analysis(reviews: list[dict]) -> dict:
 
     return {
         asp: {
-            "score": round(sum(s) / len(s), 4) if s else None,
+            "score":         round(sum(s) / len(s), 4) if s else None,
             "mention_count": len(s),
         }
         for asp, s in scores.items()

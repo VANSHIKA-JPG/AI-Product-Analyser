@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     # ── ML Models ─────────────────────────────────────────────────────
     MODELS_DIR: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml_models")
     FAKE_REVIEW_MODEL_PATH: str = os.path.join(MODELS_DIR, "fake_review_classifier.pkl")
-    VECTORIZER_PATH: str = os.path.join(MODELS_DIR, "tfidf_vectorizer.pkl")
+    VECTORIZER_PATH: str        = os.path.join(MODELS_DIR, "tfidf_vectorizer.pkl")
+    # Sentiment classifier (trained on multi-domain Amazon reviews)
+    SENTIMENT_MODEL_PATH: str       = os.path.join(MODELS_DIR, "sentiment_classifier.pkl")
+    SENTIMENT_VECTORIZER_PATH: str  = os.path.join(MODELS_DIR, "sentiment_tfidf_vectorizer.pkl")
 
     # ── Transformers ───────────────────────────────────────────────────
     SENTIMENT_MODEL: str = "distilbert-base-uncased-finetuned-sst-2-english"
