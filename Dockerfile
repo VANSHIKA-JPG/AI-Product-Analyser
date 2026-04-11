@@ -1,29 +1,25 @@
-# ── Build stage ────────────────────────────────────────────────────────────
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies
-COPY requirements.txt .
+# Install Python dependencies
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download NLTK data
-RUN python -c "import nltk; nltk.download('punkt'); nltk.download('averaged_perceptron_tagger')"
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
 
-# Copy application
-COPY . .
+# Copy backend source code
+COPY backend/ .
 
-# ── Flask API ──────────────────────────────────────────────────────────────
-FROM base AS api
-EXPOSE 5000
-CMD ["python", "app.py"]
+# Expose port
+EXPOSE 8000
 
-# ── Streamlit Dashboard ───────────────────────────────────────────────────
-FROM base AS dashboard
-EXPOSE 8501
-CMD ["streamlit", "run", "frontend/dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Start FastAPI with gunicorn
+CMD ["gunicorn", "main:app", "-c", "gunicorn.conf.py"]

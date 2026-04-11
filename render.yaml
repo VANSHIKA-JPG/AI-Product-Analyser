@@ -1,12 +1,11 @@
 services:
-  # Backend FastAPI
+  # ── Backend FastAPI (Docker) ─────────────────────────────────────────────
+  # Using Docker ensures Python 3.11 is used — bypasses Render's default Python 3.14
   - type: web
     name: ai-product-analyser-api
-    env: python
+    env: docker
     plan: free
-    pythonVersion: "3.11.9"
-    buildCommand: pip install -r backend/requirements.txt && python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
-    startCommand: cd backend && gunicorn main:app -c gunicorn.conf.py
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         value: postgresql+asyncpg://neondb_owner:npg_YumJVHrN3O4a@ep-bitter-glade-a1fd99oa-pooler.ap-southeast-1.aws.neon.tech/neondb
@@ -14,10 +13,10 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      - key: FLASK_ENV
-        value: production
+      - key: DEBUG
+        value: "False"
 
-  # Frontend React (static site)
+  # ── Frontend React (Static Site) ─────────────────────────────────────────
   - type: web
     name: ai-product-analyser-frontend
     env: static
