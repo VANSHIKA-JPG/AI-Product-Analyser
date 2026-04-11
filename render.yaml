@@ -4,6 +4,7 @@ services:
     name: ai-product-analyser-api
     env: python
     plan: free
+    pythonVersion: "3.11.9"
     buildCommand: pip install -r backend/requirements.txt; python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
     startCommand: cd backend && gunicorn main:app -c gunicorn.conf.py
     envVars:
