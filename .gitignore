@@ -50,4 +50,5 @@ frontend/.eslintrc.cjs
 
 # Backend Data / Models
 backend/data/*.csv
-backend/ml_models/*.pkl
+# NOTE: .pkl model files ARE committed — pre-trained models needed for deployment
+# backend/ml_models/*.pkl   ← intentionally NOT ignored

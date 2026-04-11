@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models.models import Product, Review, AnalysisResult, User
 from app.schemas.schemas import (
     AnalyzeRequest, AnalyzeResponse, CompareRequest, CompareResponse,
-    HistoryResponse, HistoryItemSchema, TrainModelRequest,
+    HistoryResponse, HistoryItemSchema,
 )
 from app.scraper.amazon_scraper import AmazonScraper, is_valid_amazon_url
 from app.ml.sentiment import analyze_product_reviews, analyze_review
@@ -276,14 +276,4 @@ async def compare_products_endpoint(
     return CompareResponse(comparison=comparison, total_products=len(comparison))
 
 
-@router.post("/train-model")
-async def train_model(payload: TrainModelRequest):
-    """Train the fake review detection model from a CSV dataset."""
-    detector = FakeReviewDetector()
-    try:
-        metrics = detector.train(payload.dataset_path, save_dir=settings.MODELS_DIR)
-        return {"status": "success", "metrics": metrics}
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Dataset not found: {payload.dataset_path}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
