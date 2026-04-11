@@ -39,8 +39,8 @@ scipy==1.13.1
 
 # ===== Transformers / NLP =====
 transformers==4.44.2
-# torch: CPU-only build — avoids the 2 GB GPU download on Render free tier
-torch==2.4.1+cpu --index-url https://download.pytorch.org/whl/cpu
+# torch: CPU-only build (index-url set in render.yaml build command)
+torch==2.4.1
 vaderSentiment==3.3.2
 
 # ===== NLTK only (spaCy removed — too heavy for free tier) =====

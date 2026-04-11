@@ -5,7 +5,7 @@ services:
     env: python
     plan: free
     pythonVersion: "3.11.9"
-    buildCommand: pip install -r backend/requirements.txt; python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
+    buildCommand: pip install torch==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu && pip install -r backend/requirements.txt && python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
     startCommand: cd backend && gunicorn main:app -c gunicorn.conf.py
     envVars:
       - key: DATABASE_URL
