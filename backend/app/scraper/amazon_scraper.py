@@ -33,7 +33,7 @@ def is_valid_amazon_url(url: str) -> bool:
 class BaseScraper(ABC):
     """Abstract base scraper with retry + anti-bot logic."""
 
-    def __init__(self, max_retries: int = 3, timeout: int = 15, delay_range=(2, 5)):
+    def __init__(self, max_retries: int = 2, timeout: int = 10, delay_range=(0.3, 0.8)):
         self.max_retries = max_retries
         self.timeout = timeout
         self.delay_range = delay_range
@@ -62,7 +62,7 @@ class BaseScraper(ABC):
                 code = e.response.status_code
                 logger.warning(f"HTTP {code} on attempt {attempt}: {url}")
                 if code == 503:
-                    time.sleep(random.uniform(5, 12))
+                    time.sleep(random.uniform(2, 4))   # reduced from 5-12s
             except (requests.ConnectionError, requests.Timeout):
                 logger.warning(f"Network error attempt {attempt}: {url}")
             except requests.RequestException as e:
@@ -70,7 +70,7 @@ class BaseScraper(ABC):
                 break
 
             if attempt < self.max_retries:
-                time.sleep(2 ** attempt + random.uniform(0, 1))
+                time.sleep(1)   # flat 1s between retries (was 2^attempt)
 
         logger.error(f"All {self.max_retries} retries failed: {url}")
         return None
@@ -95,8 +95,10 @@ class AmazonScraper(BaseScraper):
         return "captcha" in html.lower() or "robot check" in html.lower()
 
     def scrape_product_info(self, url: str) -> dict | None:
-        html = self.fetch(url)
+        # Normalize URL — strip tracking params, keep only the clean ASIN path
         asin = extract_asin(url)
+        clean_url = f"{self.BASE}/dp/{asin}/" if asin else url
+        html = self.fetch(clean_url)
         
         # Anti-Bot Fallback Mode: If Amazon blocks us, use a mock product for the demonstration
         if not html or self._is_captcha(html) or not self._name(BeautifulSoup(html, "lxml")):
@@ -125,6 +127,8 @@ class AmazonScraper(BaseScraper):
         }
 
     def scrape_reviews(self, url: str, max_reviews: int = 100) -> list[dict]:
+        # Normalize: cap at 10 to stay within Render's 30s gateway timeout
+        max_reviews = min(max_reviews, 10)
         asin = extract_asin(url)
         if not asin:
             return []
