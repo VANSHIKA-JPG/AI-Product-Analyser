@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+const BACKEND_URL = import.meta.env.VITE_API_BASE ?? 'https://ai-product-analyser-4.onrender.com/api'
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || '/api',
+  baseURL: BACKEND_URL,
   timeout: 120000, // 2 min for analysis
   headers: { 'Content-Type': 'application/json' },
 })

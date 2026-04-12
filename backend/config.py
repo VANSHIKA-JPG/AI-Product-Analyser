@@ -27,7 +27,11 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
     # ── CORS ───────────────────────────────────────────────────────────
-    CORS_ORIGINS: list[str] = ["*"]
+    CORS_ORIGINS: list[str] = [
+        "https://ai-product-analyser.vercel.app",  # Vercel frontend
+        "http://localhost:5173",                    # local dev
+        "http://localhost:3000",
+    ]
 
     # ── Scraper ────────────────────────────────────────────────────────
     SCRAPER_MAX_RETRIES: int = 3
