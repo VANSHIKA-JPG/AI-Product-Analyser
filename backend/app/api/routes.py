@@ -17,7 +17,7 @@ from app.schemas.schemas import (
     HistoryResponse, HistoryItemSchema,
 )
 from app.scraper.amazon_scraper import AmazonScraper, is_valid_amazon_url
-from app.ml.sentiment import analyze_product_reviews, analyze_review, init_sentiment_classifier
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from app.ml.fake_review import FakeReviewDetector
 from app.ml.summarizer import ProductSummarizer, analyze_price_value, compare_products
 from app.api.deps import get_optional_user
@@ -55,13 +55,8 @@ def get_summarizer() -> ProductSummarizer:
 
 def startup_ml_models():
     """Load all ML models once at server startup. Called from main.py lifespan."""
-    # Fake review detector
     get_detector()
-    # Sentiment classifier
-    init_sentiment_classifier(
-        model_path=settings.SENTIMENT_MODEL_PATH,
-        vectorizer_path=settings.SENTIMENT_VECTORIZER_PATH,
-    )
+    logger.info("Fake review detector loaded")
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -105,23 +100,52 @@ async def analyze_product(
     if not reviews_data:
         raise HTTPException(status_code=404, detail="No reviews found for this product")
 
-    logger.info(f"Scraped {len(reviews_data)} reviews — running ML in parallel")
+    logger.info(f"Scraped {len(reviews_data)} reviews — running VADER sentiment + fake detection")
 
-    # 2 — Sentiment + Fake Detection IN PARALLEL ──────────────────────
+    # 2 — VADER Sentiment (fast, no threads needed) + Fake Detection IN PARALLEL ──
+    vader = SentimentIntensityAnalyzer()
     detector = get_detector()
 
-    def run_sentiment():
-        return analyze_product_reviews(reviews_data, use_transformer=settings.USE_TRANSFORMER_SENTIMENT)
+    def _vader_score(text: str) -> dict:
+        sc = vader.polarity_scores(text or "")
+        compound = sc["compound"]
+        label = "positive" if compound >= 0.05 else "negative" if compound <= -0.05 else "neutral"
+        return {"compound": compound, "pos": sc["pos"], "neg": sc["neg"], "neu": sc["neu"], "label": label}
+
+    # Compute VADER for all reviews (synchronous, very fast)
+    vader_scores = [_vader_score(rv.get("text", "")) for rv in reviews_data]
+
+    total = len(vader_scores)
+    pos_count = sum(1 for s in vader_scores if s["label"] == "positive")
+    neg_count = sum(1 for s in vader_scores if s["label"] == "negative")
+    neu_count = total - pos_count - neg_count
+    overall_score = sum(s["compound"] for s in vader_scores) / max(total, 1)
+    pos_pct = round(pos_count / max(total, 1) * 100, 1)
+    neg_pct = round(neg_count / max(total, 1) * 100, 1)
+    neu_pct = round(neu_count / max(total, 1) * 100, 1)
+
+    # Distribution buckets
+    dist = {"very_negative": 0, "negative": 0, "neutral": 0, "positive": 0, "very_positive": 0}
+    for s in vader_scores:
+        c = s["compound"]
+        if c <= -0.5: dist["very_negative"] += 1
+        elif c <= -0.05: dist["negative"] += 1
+        elif c < 0.05: dist["neutral"] += 1
+        elif c < 0.5: dist["positive"] += 1
+        else: dist["very_positive"] += 1
+
+    # Run fake detection in thread (uses ML + preprocessor)
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    loop = asyncio.get_event_loop()
 
     def run_fake():
         return detector.predict_batch(reviews_data), detector.trust_score(reviews_data)
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        sentiment_fut = loop.run_in_executor(pool, run_sentiment)
-        fake_fut      = loop.run_in_executor(pool, run_fake)
-        sentiment, (fake_results, trust) = await asyncio.gather(sentiment_fut, fake_fut)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fake_results, trust = await loop.run_in_executor(pool, run_fake)
 
-    logger.info("ML done — running Gemini summary + price analysis in parallel")
+    logger.info("Sentiment + Fake done — running Gemini summary + price analysis in parallel")
 
     # 3 — Gemini Summary + Price Analysis IN PARALLEL ────────────────
     summarizer = get_summarizer()
@@ -132,14 +156,14 @@ async def analyze_product(
             reviews=reviews_data,
             price=product_info.get("price"),
             average_rating=product_info.get("average_rating"),
-            sentiment_data={"positive_pct": sentiment.positive_pct, "negative_pct": sentiment.negative_pct},
+            sentiment_data={"positive_pct": pos_pct, "negative_pct": neg_pct},
         )
 
     def run_price():
         return analyze_price_value(
             price=product_info.get("price", 0),
             average_rating=product_info.get("average_rating"),
-            sentiment_score=sentiment.overall_score,
+            sentiment_score=overall_score,
         )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -156,10 +180,8 @@ async def analyze_product(
     db.add(product)
     await db.flush()
 
-    per_review_results = analyze_product_reviews.__wrapped__ if hasattr(analyze_product_reviews, "__wrapped__") else None
-
     for i, rv in enumerate(reviews_data):
-        single_sentiment = analyze_review(rv.get("text", ""), settings.USE_TRANSFORMER_SENTIMENT)
+        vs = vader_scores[i]
         fake_res = fake_results[i] if i < len(fake_results) else None
         review = Review(
             product_id=product.id,
@@ -169,9 +191,9 @@ async def analyze_product(
             text=rv.get("text"),
             date=rv.get("date"),
             verified_purchase=rv.get("verified_purchase", False),
-            sentiment_score=single_sentiment.combined_score,
-            sentiment_label=single_sentiment.label,
-            transformer_sentiment=single_sentiment.transformer_label or None,
+            sentiment_score=vs["compound"],
+            sentiment_label=vs["label"],
+            transformer_sentiment=None,
             fake_probability=fake_res.fake_probability if fake_res else None,
         )
         db.add(review)
@@ -179,10 +201,10 @@ async def analyze_product(
     analysis = AnalysisResult(
         product_id=product.id,
         user_id=current_user.id if current_user else None,
-        overall_sentiment_score=sentiment.overall_score,
-        positive_percentage=sentiment.positive_pct,
-        negative_percentage=sentiment.negative_pct,
-        neutral_percentage=sentiment.neutral_pct,
+        overall_sentiment_score=overall_score,
+        positive_percentage=pos_pct,
+        negative_percentage=neg_pct,
+        neutral_percentage=neu_pct,
         trust_score=trust.score,
         total_reviews_analyzed=trust.total_analyzed,
         suspicious_reviews_count=trust.suspicious_count,
@@ -205,14 +227,14 @@ async def analyze_product(
         analysis_id=analysis.id,
         product=product.to_dict(),
         sentiment={
-            "overall_score": sentiment.overall_score,
-            "positive_pct": sentiment.positive_pct,
-            "negative_pct": sentiment.negative_pct,
-            "neutral_pct": sentiment.neutral_pct,
-            "total_reviews": sentiment.total_reviews,
-            "confidence": sentiment.average_confidence,
-            "aspects": sentiment.aspect_sentiments,
-            "distribution": sentiment.score_distribution,
+            "overall_score": overall_score,
+            "positive_pct": pos_pct,
+            "negative_pct": neg_pct,
+            "neutral_pct": neu_pct,
+            "total_reviews": total,
+            "confidence": 1.0,
+            "aspects": {},
+            "distribution": dist,
         },
         trust={
             "score": trust.score,
