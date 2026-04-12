@@ -76,56 +76,79 @@ async def analyze_product(
     Full AI analysis pipeline for an Amazon product.
 
     Steps:
-        1. Scrape product info + reviews
-        2. Sentiment analysis (VADER ± transformer)
-        3. Fake review detection
-        4. AI summarization (Gemini)
-        5. Price/value analysis
-        6. Persist to PostgreSQL
+        1. Scrape product info + reviews          (parallel)
+        2. Sentiment analysis + Fake detection    (parallel)
+        3. AI summarization + Price analysis      (parallel)
+        4. Persist to PostgreSQL
     """
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
     if not is_valid_amazon_url(payload.url):
         raise HTTPException(status_code=400, detail="Invalid Amazon product URL")
 
     logger.info(f"Starting analysis: {payload.url}")
 
-    # 1 — Scrape ─────────────────────────────────────────────────────────
+    # Cap reviews at 20 to keep total time under 30s on free tier
+    max_reviews = min(payload.max_reviews, 20)
+
+    # 1 — Scrape product info + reviews IN PARALLEL ────────────────────
+    loop = asyncio.get_event_loop()
     scraper = AmazonScraper()
-    product_info = scraper.scrape_product_info(payload.url)
+
+    product_info, reviews_data = await asyncio.gather(
+        loop.run_in_executor(None, scraper.scrape_product_info, payload.url),
+        loop.run_in_executor(None, lambda: scraper.scrape_reviews(payload.url, max_reviews)),
+    )
+
     if not product_info:
         raise HTTPException(status_code=502, detail="Failed to scrape product info")
-
-    reviews_data = scraper.scrape_reviews(payload.url, max_reviews=payload.max_reviews)
     if not reviews_data:
         raise HTTPException(status_code=404, detail="No reviews found for this product")
 
-    # 2 — Sentiment ──────────────────────────────────────────────────────
-    sentiment = analyze_product_reviews(
-        reviews_data, use_transformer=settings.USE_TRANSFORMER_SENTIMENT
-    )
+    logger.info(f"Scraped {len(reviews_data)} reviews — running ML in parallel")
 
-    # 3 — Fake Review Detection ──────────────────────────────────────────
+    # 2 — Sentiment + Fake Detection IN PARALLEL ──────────────────────
     detector = get_detector()
-    fake_results = detector.predict_batch(reviews_data)
-    trust = detector.trust_score(reviews_data)
 
-    # 4 — AI Summary ─────────────────────────────────────────────────────
+    def run_sentiment():
+        return analyze_product_reviews(reviews_data, use_transformer=settings.USE_TRANSFORMER_SENTIMENT)
+
+    def run_fake():
+        return detector.predict_batch(reviews_data), detector.trust_score(reviews_data)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        sentiment_fut = loop.run_in_executor(pool, run_sentiment)
+        fake_fut      = loop.run_in_executor(pool, run_fake)
+        sentiment, (fake_results, trust) = await asyncio.gather(sentiment_fut, fake_fut)
+
+    logger.info("ML done — running Gemini summary + price analysis in parallel")
+
+    # 3 — Gemini Summary + Price Analysis IN PARALLEL ────────────────
     summarizer = get_summarizer()
-    ai_summary = summarizer.summarize(
-        product_name=product_info.get("name", "Unknown Product"),
-        reviews=reviews_data,
-        price=product_info.get("price"),
-        average_rating=product_info.get("average_rating"),
-        sentiment_data={"positive_pct": sentiment.positive_pct, "negative_pct": sentiment.negative_pct},
-    )
 
-    # 5 — Price Analysis ─────────────────────────────────────────────────
-    price_analysis = analyze_price_value(
-        price=product_info.get("price", 0),
-        average_rating=product_info.get("average_rating"),
-        sentiment_score=sentiment.overall_score,
-    )
+    def run_summary():
+        return summarizer.summarize(
+            product_name=product_info.get("name", "Unknown Product"),
+            reviews=reviews_data,
+            price=product_info.get("price"),
+            average_rating=product_info.get("average_rating"),
+            sentiment_data={"positive_pct": sentiment.positive_pct, "negative_pct": sentiment.negative_pct},
+        )
 
-    # 6 — Persist ────────────────────────────────────────────────────────
+    def run_price():
+        return analyze_price_value(
+            price=product_info.get("price", 0),
+            average_rating=product_info.get("average_rating"),
+            sentiment_score=sentiment.overall_score,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ai_summary, price_analysis = await asyncio.gather(
+            loop.run_in_executor(pool, run_summary),
+            loop.run_in_executor(pool, run_price),
+        )
+
+    # 4 — Persist ────────────────────────────────────────────────
     product = Product(**{k: product_info.get(k) for k in [
         "url", "asin", "name", "brand", "price", "average_rating",
         "total_ratings", "image_url", "category",
