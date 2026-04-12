@@ -15,21 +15,35 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-
-  const handleAnalyse = async (e) => {
-    e.preventDefault()
-    if (!url.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      const { data } = await api.post('/analyze', { url: url.trim(), max_reviews: 50 })
-      navigate('/results', { state: { result: data } })
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Analysis failed. Check the URL and try again.')
-    } finally {
-      setLoading(false)
+  
+  const normalizeAmazonUrl = (raw) => {
+  try {
+    const u = new URL(raw)
+    const match = raw.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i)
+    if (match) {
+      return `https://${u.hostname}/dp/${match[1]}/`
     }
+    return raw
+  } catch {
+    return raw
   }
+}
+
+ const handleAnalyse = async (e) => {
+  e.preventDefault()
+  if (!url.trim()) return
+  setLoading(true)
+  setError('')
+  try {
+    const cleanUrl = normalizeAmazonUrl(url.trim())  // ← ADD THIS
+    const { data } = await api.post('/analyze', { url: cleanUrl, max_reviews: 50 })  // ← use cleanUrl
+    navigate('/results', { state: { result: data } })
+  } catch (err) {
+    setError(err.response?.data?.detail || 'Analysis failed. Check the URL and try again.')
+  } finally {
+    setLoading(false)
+  }
+} 
 
   return (
     <div className="animate-fade-in">
@@ -55,7 +69,7 @@ export default function Home() {
               id="product-url-input"
               type="url"
               className="input flex-1 text-base"
-              placeholder="https://www.amazon.in/dp/B0XXXXXXXX/"
+              placeholder="https://www.amazon.in/dp/B0D79HM1FC/"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}
