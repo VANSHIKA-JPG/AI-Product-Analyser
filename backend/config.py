@@ -27,11 +27,7 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
     # ── CORS ───────────────────────────────────────────────────────────
-    CORS_ORIGINS: list[str] = [
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",   # Alternative
-        "https://your-app.onrender.com",
-    ]
+    CORS_ORIGINS: list[str] = ["*"]
 
     # ── Scraper ────────────────────────────────────────────────────────
     SCRAPER_MAX_RETRIES: int = 3
