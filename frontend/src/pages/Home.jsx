@@ -35,12 +35,12 @@ export default function Home() {
     <div className="animate-fade-in">
       {/* Hero */}
       <div className="text-center py-20 px-4">
-        <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 text-indigo-400 text-sm font-medium mb-6">
+        <div className="inline-flex items-center gap-2 bg-brand-cyan/10 border border-brand-cyan/20 rounded-full px-4 py-1.5 text-brand-cyan text-sm font-medium mb-6 shadow-[0_0_15px_rgba(110,231,249,0.15)]">
           <Sparkles className="w-3.5 h-3.5" /> Powered by Gemini AI + ML
         </div>
-        <h1 className="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
-          <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            AI Product Analyser
+        <h1 className="text-5xl md:text-6xl md:text-7xl font-extrabold mb-6 leading-tight drop-shadow-xl">
+          <span className="bg-gradient-to-r from-brand-cyan via-white to-brand-lavender bg-clip-text text-transparent">
+            ReviewLens
           </span>
         </h1>
         <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-12">
@@ -98,13 +98,17 @@ export default function Home() {
 
       {/* Features Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 py-8">
-        {features.map(({ icon: Icon, title, desc }) => (
-          <div key={title} className="glass p-6 hover:bg-white/10 transition-all duration-300 group">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-500/30 transition-colors">
-              <Icon className="w-5 h-5 text-indigo-400" />
+        {features.map(({ icon: Icon, title, desc }, idx) => (
+          <div 
+            key={title} 
+            className="glass p-6 hover:bg-white/5 transition-all duration-300 group animate-float"
+            style={{ animationDelay: `${idx * 0.15}s` }}
+          >
+            <div className="w-12 h-12 rounded-xl bg-brand-cyan/10 flex items-center justify-center mb-4 group-hover:bg-brand-cyan/20 group-hover:shadow-[0_0_15px_rgba(110,231,249,0.3)] transition-all">
+              <Icon className="w-6 h-6 text-brand-cyan" />
             </div>
-            <h3 className="font-semibold text-gray-100 mb-1">{title}</h3>
-            <p className="text-sm text-gray-500">{desc}</p>
+            <h3 className="font-semibold text-gray-100 mb-2">{title}</h3>
+            <p className="text-sm text-gray-400">{desc}</p>
           </div>
         ))}
       </div>

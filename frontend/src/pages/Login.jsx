@@ -27,8 +27,8 @@ export default function Login() {
     <div className="flex items-center justify-center min-h-[70vh] animate-fade-in">
       <div className="glass p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
-            <LogIn className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-lavender flex items-center justify-center mx-auto mb-5 shadow-[0_0_20px_rgba(110,231,249,0.3)]">
+            <LogIn className="w-7 h-7 text-brand-navy" />
           </div>
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-gray-400 text-sm mt-1">Sign in to your account</p>
@@ -49,8 +49,8 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Don't have an account? <Link to="/register" className="text-indigo-400 hover:underline">Register</Link>
+        <p className="text-center text-sm text-gray-400 mt-6 pt-4 border-t border-white/5">
+          Don't have an account? <Link to="/register" className="text-brand-cyan font-medium hover:text-brand-cyanHover hover:underline transition-colors">Register</Link>
         </p>
       </div>
     </div>

@@ -4,38 +4,37 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  body { @apply bg-gray-950 text-gray-100 font-sans; }
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { @apply bg-gray-900; }
-  ::-webkit-scrollbar-thumb { @apply bg-gray-600 rounded-full; }
+  body { @apply bg-brand-navy text-gray-200 font-sans antialiased selection:bg-brand-cyan/30 selection:text-brand-cyan; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { @apply bg-brand-navy; }
+  ::-webkit-scrollbar-thumb { @apply bg-white/10 hover:bg-white/20 rounded-full transition-colors; }
 }
 
 @layer components {
   /* Glass card */
   .glass {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+    @apply bg-brand-glass/70 backdrop-blur-xl border border-white/5 rounded-2xl shadow-xl shadow-black/40 hover:border-brand-cyan/20 hover:shadow-brand-cyan/5 transition-all duration-300;
   }
   /* Gradient button */
   .btn-primary {
-    @apply bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 
-           text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 
-           hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 active:translate-y-0;
+    @apply bg-gradient-to-r from-brand-cyan to-brand-lavender hover:from-brand-cyanHover hover:to-brand-cyan text-brand-navy font-bold py-3 px-6 rounded-xl transition-all duration-300 
+           hover:shadow-[0_0_20px_rgba(110,231,249,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-secondary {
-    @apply bg-gray-800 hover:bg-gray-700 text-gray-100 font-medium py-2.5 px-5 
-           rounded-xl transition-all duration-200 border border-gray-700;
+    @apply bg-brand-glass/50 hover:bg-white/10 text-brand-cyan font-medium py-2.5 px-5 
+           rounded-xl transition-all duration-300 border border-brand-cyan/20 hover:border-brand-cyan/50 hover:shadow-[0_0_15px_rgba(110,231,249,0.2)];
   }
   /* Input */
   .input {
-    @apply w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 
+    @apply w-full bg-brand-navy/50 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 
            text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 
-           focus:ring-indigo-500 focus:border-transparent transition-all duration-200;
+           focus:ring-brand-cyan/50 focus:border-transparent transition-all duration-300 hover:border-white/20 shadow-inner;
   }
   /* Badge */
-  .badge-buy    { @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
-  .badge-skip   { @apply bg-red-500/20     text-red-400     border border-red-500/30; }
-  .badge-maybe  { @apply bg-amber-500/20   text-amber-400   border border-amber-500/30; }
-  .badge-low    { @apply bg-emerald-500/20 text-emerald-400; }
-  .badge-medium { @apply bg-amber-500/20   text-amber-400; }
-  .badge-high   { @apply bg-red-500/20     text-red-400; }
+  .badge-buy    { @apply bg-brand-success/10 text-brand-success border border-brand-success/30 shadow-[0_0_10px_rgba(52,211,153,0.1)]; }
+  .badge-skip   { @apply bg-brand-alert/10   text-brand-alert   border border-brand-alert/30 shadow-[0_0_10px_rgba(248,113,113,0.1)]; }
+  .badge-maybe  { @apply bg-brand-lavender/10 text-brand-lavender border border-brand-lavender/30 shadow-[0_0_10px_rgba(167,139,250,0.1)]; }
+  .badge-low    { @apply badge-buy; }
+  .badge-medium { @apply badge-maybe; }
+  .badge-high   { @apply badge-skip; }
 }

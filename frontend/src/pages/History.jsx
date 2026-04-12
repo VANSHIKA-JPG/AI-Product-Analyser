@@ -15,7 +15,7 @@ export default function History() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-brand-cyan/30 border-t-brand-cyan rounded-full animate-spin shadow-[0_0_15px_rgba(110,231,249,0.5)]" />
     </div>
   )
 
@@ -30,29 +30,29 @@ export default function History() {
     <div className="animate-fade-in space-y-4 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Analysis History <span className="text-gray-500 text-base font-normal">({data.total})</span></h1>
       {data.results.map(({ analysis, product }, i) => (
-        <div key={analysis.id} className="glass overflow-hidden">
+        <div key={analysis.id} className="glass overflow-hidden group">
           <button
-            className="w-full p-5 flex items-center gap-4 text-left hover:bg-white/5 transition-colors"
+            className="w-full p-5 flex items-center gap-4 text-left hover:bg-white/5 transition-all duration-300"
             onClick={() => setExpanded(expanded === i ? null : i)}
           >
             {product?.image_url && <img src={product.image_url} alt="" className="w-12 h-12 object-contain rounded-lg bg-gray-900 p-1 shrink-0" />}
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{product?.name || 'Unknown Product'}</p>
               <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-                {product?.price && <span className="text-indigo-400 font-medium">₹{product.price.toLocaleString()}</span>}
-                {product?.average_rating && <span className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" />{product.average_rating}</span>}
+                {product?.price && <span className="text-brand-cyan font-medium shadow-brand-cyan/20">₹{product.price.toLocaleString()}</span>}
+                {product?.average_rating && <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />{product.average_rating}</span>}
                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(analysis.analyzed_at).toLocaleDateString()}</span>
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-sm text-emerald-400 font-medium">{analysis.positive_percentage?.toFixed(0)}% pos</span>
+              <span className="text-sm text-brand-success font-medium">{analysis.positive_percentage?.toFixed(0)}% pos</span>
               <span className="text-sm text-gray-400">Trust: {analysis.trust_score?.toFixed(0)}</span>
-              {expanded === i ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              {expanded === i ? <ChevronUp className="w-5 h-5 text-brand-cyan transition-transform" /> : <ChevronDown className="w-5 h-5 text-gray-500 group-hover:text-brand-cyan/70 transition-transform" />}
             </div>
           </button>
           {expanded === i && (
-            <div className="px-5 pb-5 pt-0 border-t border-white/10 text-sm text-gray-400 space-y-2 animate-slide-up">
-              {analysis.ai_summary && <p>{analysis.ai_summary}</p>}
+            <div className="px-5 pb-5 pt-2 border-t border-white/5 text-sm text-gray-400 space-y-3 animate-slide-up bg-white/5">
+              {analysis.ai_summary && <p className="leading-relaxed text-gray-300">{analysis.ai_summary}</p>}
               <div className="flex gap-4">
                 <span>📊 Sentiment: {analysis.overall_sentiment_score?.toFixed(2)}</span>
                 <span>🛡️ Trust: {analysis.trust_score?.toFixed(0)}/100</span>
