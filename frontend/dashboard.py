@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # ── API Configuration ─────────────────────────────────────────────────────
-API_BASE = "http://localhost:5000/api"
+API_BASE = "https://ai-product-analyser-4.onrender.com/api"
 
 
 # ── Custom CSS ─────────────────────────────────────────────────────────────

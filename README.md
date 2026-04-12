@@ -107,8 +107,9 @@ Visit **http://localhost:8501** and paste any Amazon India product URL!
 ```bash
 docker-compose up --build
 ```
-- API: http://localhost:5000
-- Dashboard: http://localhost:8501
+### Application URLs
+- API: https://ai-product-analyser-4.onrender.com
+- Dashboard: http://localhost:5173
 
 ---
 

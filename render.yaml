@@ -29,4 +29,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE
-        value: https://ai-product-analyser-api.onrender.com/api
+        value: https://ai-product-analyser-4.onrender.com/api
