@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.api import routes, auth
 from app.api.routes import startup_ml_models
+from app.ml.preprocessor import _ensure_nltk
 from config import get_settings
 
 settings = get_settings()
@@ -28,7 +29,9 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting AI Product Analyser API...")
     await init_db()
     logger.info("✅ Database tables created/verified")
-    startup_ml_models()          # Load fake review + sentiment .pkl models
+    _ensure_nltk()                   # Pre-load NLTK/WordNet in main thread (thread-safety)
+    logger.info("✅ NLTK/WordNet ready")
+    startup_ml_models()              # Load fake review + sentiment .pkl models
     logger.info("✅ ML models loaded")
     yield
     logger.info("Shutting down...")

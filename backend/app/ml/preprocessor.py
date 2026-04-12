@@ -5,6 +5,7 @@ Cleans and normalizes review text before ML analysis.
 
 import re
 import logging
+import threading
 from functools import lru_cache
 
 import nltk
@@ -14,18 +15,33 @@ from nltk.stem import WordNetLemmatizer
 
 logger = logging.getLogger("Preprocessor")
 
+
 # Download NLTK data on first use
 _nltk_ready = False
+_nltk_lock = threading.Lock()  # prevents race condition in ThreadPoolExecutor
 
 
 def _ensure_nltk():
+    """Thread-safe, idempotent NLTK initializer."""
     global _nltk_ready
-    if not _nltk_ready:
-        for pkg in ["punkt", "stopwords", "wordnet", "averaged_perceptron_tagger"]:
+    if _nltk_ready:
+        return
+    with _nltk_lock:
+        if _nltk_ready:   # double-checked locking
+            return
+        for pkg in ["punkt", "punkt_tab", "stopwords", "wordnet", "averaged_perceptron_tagger"]:
             try:
                 nltk.download(pkg, quiet=True)
             except Exception:
                 pass
+        # Force-initialize WordNet NOW in this thread so LazyCorpusLoader
+        # is fully loaded before any ThreadPoolExecutor threads touch it.
+        try:
+            _lem = WordNetLemmatizer()
+            _lem.lemmatize("test")   # triggers the lazy load
+            _ = set(stopwords.words("english"))  # same for stopwords
+        except Exception as e:
+            logger.warning(f"NLTK warm-up failed: {e}")
         _nltk_ready = True
 
 
