@@ -45,39 +45,58 @@ class ProductSummarizer:
             return self._fallback(product_name, reviews)
 
         review_lines = []
-        for r in reviews[:30]:
-            text = clean_text(r.get("text", ""))[:200]
-            rating = r.get("rating", "?")
-            review_lines.append(f"[{rating}★] {text}")
+        if reviews:
+            for r in reviews[:30]:
+                text = clean_text(r.get("text", ""))[:200]
+                rating = r.get("rating", "?")
+                review_lines.append(f"[{rating}★] {text}")
+        
+        has_reviews = len(review_lines) > 0
+        context_msg = "Analyse these scraped Amazon reviews." if has_reviews else "Live reviews are currently unavailable. Rely entirely on your vast training knowledge of this product to generate highly accurate market insights."
 
-        price_str = f"₹{price}" if price else "N/A"
-        rating_str = f"{average_rating}/5" if average_rating else "N/A"
+        price_str = f"₹{price}" if price and price > 0 else "Market Price"
+        rating_str = f"{average_rating}/5" if average_rating and average_rating > 0 else "N/A"
         sentiment_str = ""
-        if sentiment_data:
+        if sentiment_data and has_reviews:
             sentiment_str = (
                 f"Sentiment: {sentiment_data.get('positive_pct', 0):.0f}% positive, "
                 f"{sentiment_data.get('negative_pct', 0):.0f}% negative"
             )
 
-        prompt = f"""You are an expert product analyst. Analyse these Amazon reviews and respond ONLY in valid JSON.
+        prompt = f"""You are an expert product analyst. {context_msg} Respond ONLY in valid JSON.
 
 Product: {product_name}
 Price: {price_str} | Rating: {rating_str}
 {sentiment_str}
 
 Reviews:
-{chr(10).join(review_lines)}
+{chr(10).join(review_lines) if has_reviews else "No live reviews provided. Use your AI knowledge."}
 
-JSON format (strictly follow this):
+JSON format (strictly follow this schema):
 {{
-  "summary": "2-3 sentence balanced overview",
-  "pros": ["pro1", "pro2", "pro3", "pro4"],
+  "summary": "2-3 sentence balanced overview of the product",
+  "pros": ["pro1", "pro2", "pro3"],
   "cons": ["con1", "con2", "con3"],
+  "common_complaints": ["complaint1", "complaint2"],
   "recommendation": "buy" | "skip" | "maybe",
-  "recommendation_reason": "one sentence",
+  "recommendation_reason": "One sentence explaining the verdict (e.g. Worth Buying / Consider Alternatives / Avoid)",
   "key_insights": ["insight1", "insight2"],
-  "best_for": "ideal buyer description",
-  "avoid_if": "who should avoid"
+  "best_for": "Who is this ideal for?",
+  "avoid_if": "Who should avoid this?",
+  "competitors": [
+    {{
+      "name": "Competitor 1 Name",
+      "price": "approx price",
+      "rating": "approx rating/5",
+      "features": ["feature 1", "feature 2"],
+      "pros": ["pro 1", "pro 2"],
+      "cons": ["con 1", "con 2"],
+      "best_for": "ideal buyer",
+      "score": 85
+    }},
+    {{ ... }},
+    {{ ... }}
+  ]
 }}"""
 
         try:
@@ -99,8 +118,9 @@ JSON format (strictly follow this):
         try:
             return json.loads(cleaned.strip())
         except json.JSONDecodeError:
-            return {"summary": text[:400], "pros": [], "cons": [], "recommendation": "maybe",
-                    "recommendation_reason": "Could not parse AI response", "key_insights": []}
+            return {"summary": text[:400], "pros": [], "cons": [], "common_complaints": [], 
+                    "recommendation": "maybe", "recommendation_reason": "Could not parse AI response", 
+                    "key_insights": [], "competitors": []}
 
     def _fallback(self, name: str, reviews: list[dict]) -> dict:
         ratings = [r.get("rating", 0) for r in reviews if r.get("rating")]
@@ -110,10 +130,12 @@ JSON format (strictly follow this):
             "summary": f"{name} — avg rating {avg:.1f}/5 from {len(reviews)} reviews.",
             "pros": ["Enable Gemini API for detailed AI analysis"],
             "cons": ["Enable Gemini API for detailed AI analysis"],
+            "common_complaints": [],
             "recommendation": rec,
             "recommendation_reason": f"Based on avg rating {avg:.1f}/5",
             "key_insights": [f"Analyzed {len(reviews)} customer reviews"],
             "best_for": "", "avoid_if": "",
+            "competitors": []
         }
 
 

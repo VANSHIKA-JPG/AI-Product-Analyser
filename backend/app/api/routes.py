@@ -97,7 +97,9 @@ async def analyze_product(
 
     if not product_info:
         raise HTTPException(status_code=502, detail="Failed to scrape product info")
-    if not reviews_data:
+        
+    is_fallback = product_info.get("is_fallback", False)
+    if not reviews_data and not is_fallback:
         raise HTTPException(status_code=404, detail="No reviews found for this product")
 
     logger.info(f"Scraped {len(reviews_data)} reviews — running VADER sentiment + fake detection")
@@ -112,38 +114,47 @@ async def analyze_product(
         label = "positive" if compound >= 0.05 else "negative" if compound <= -0.05 else "neutral"
         return {"compound": compound, "pos": sc["pos"], "neg": sc["neg"], "neu": sc["neu"], "label": label}
 
-    # Compute VADER for all reviews (synchronous, very fast)
-    vader_scores = [_vader_score(rv.get("text", "")) for rv in reviews_data]
-
-    total = len(vader_scores)
-    pos_count = sum(1 for s in vader_scores if s["label"] == "positive")
-    neg_count = sum(1 for s in vader_scores if s["label"] == "negative")
-    neu_count = total - pos_count - neg_count
-    overall_score = sum(s["compound"] for s in vader_scores) / max(total, 1)
-    pos_pct = round(pos_count / max(total, 1) * 100, 1)
-    neg_pct = round(neg_count / max(total, 1) * 100, 1)
-    neu_pct = round(neu_count / max(total, 1) * 100, 1)
-
-    # Distribution buckets
-    dist = {"very_negative": 0, "negative": 0, "neutral": 0, "positive": 0, "very_positive": 0}
-    for s in vader_scores:
-        c = s["compound"]
-        if c <= -0.5: dist["very_negative"] += 1
-        elif c <= -0.05: dist["negative"] += 1
-        elif c < 0.05: dist["neutral"] += 1
-        elif c < 0.5: dist["positive"] += 1
-        else: dist["very_positive"] += 1
-
-    # Run fake detection in thread (uses ML + preprocessor)
-    import asyncio
-    from concurrent.futures import ThreadPoolExecutor
-    loop = asyncio.get_event_loop()
-
-    def run_fake():
-        return detector.predict_batch(reviews_data), detector.trust_score(reviews_data)
-
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        fake_results, trust = await loop.run_in_executor(pool, run_fake)
+    if is_fallback or not reviews_data:
+        vader_scores = []
+        pos_pct, neg_pct, neu_pct, overall_score = 0.0, 0.0, 0.0, 0.0
+        dist = {"very_negative": 0, "negative": 0, "neutral": 0, "positive": 0, "very_positive": 0}
+        
+        from app.ml.fake_review import TrustScore
+        trust = TrustScore(score=0.0, total_analyzed=0, suspicious_count=0, suspicious_percentage=0.0, risk_level="unknown")
+        fake_results = []
+    else:
+        # Compute VADER for all reviews (synchronous, very fast)
+        vader_scores = [_vader_score(rv.get("text", "")) for rv in reviews_data]
+    
+        total = len(vader_scores)
+        pos_count = sum(1 for s in vader_scores if s["label"] == "positive")
+        neg_count = sum(1 for s in vader_scores if s["label"] == "negative")
+        neu_count = total - pos_count - neg_count
+        overall_score = sum(s["compound"] for s in vader_scores) / max(total, 1)
+        pos_pct = round(pos_count / max(total, 1) * 100, 1)
+        neg_pct = round(neg_count / max(total, 1) * 100, 1)
+        neu_pct = round(neu_count / max(total, 1) * 100, 1)
+    
+        # Distribution buckets
+        dist = {"very_negative": 0, "negative": 0, "neutral": 0, "positive": 0, "very_positive": 0}
+        for s in vader_scores:
+            c = s["compound"]
+            if c <= -0.5: dist["very_negative"] += 1
+            elif c <= -0.05: dist["negative"] += 1
+            elif c < 0.05: dist["neutral"] += 1
+            elif c < 0.5: dist["positive"] += 1
+            else: dist["very_positive"] += 1
+    
+        # Run fake detection in thread (uses ML + preprocessor)
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        loop = asyncio.get_event_loop()
+    
+        def run_fake():
+            return detector.predict_batch(reviews_data), detector.trust_score(reviews_data)
+    
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fake_results, trust = await loop.run_in_executor(pool, run_fake)
 
     logger.info("Sentiment + Fake done — running Gemini summary + price analysis in parallel")
 

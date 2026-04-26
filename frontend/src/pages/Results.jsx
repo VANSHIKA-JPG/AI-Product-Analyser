@@ -123,22 +123,55 @@ export default function Results() {
         </div>
       </div>
 
-      {/* Score Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-        <div className="glass p-6 flex flex-col items-center justify-center">
-          <ScoreRing
-            value={Math.round((sentiment.overall_score + 1) / 2 * 100)}
-            label="Sentiment"
-            color={sentiment.overall_score > 0.2 ? 'success' : sentiment.overall_score < -0.2 ? 'alert' : 'amber'}
-          />
+      {/* Fallback Banner */}
+      {product.is_fallback && (
+        <div className="glass p-5 border-l-4 border-brand-cyan bg-brand-cyan/5 flex items-start gap-4 animate-slide-up">
+          <div className="p-2 bg-brand-cyan/10 rounded-lg shrink-0">
+            <span className="text-xl">⚠️</span>
+          </div>
+          <div>
+            <h3 className="text-brand-cyan font-bold text-lg">Live Amazon data is temporarily unavailable.</h3>
+            <p className="text-gray-300 text-sm mt-1">Showing AI-generated market insights and competitive analysis based on available product information. Try another product for fresh live review data.</p>
+          </div>
         </div>
-        <div className="glass p-6 flex flex-col items-center justify-center">
-          <ScoreRing
-            value={Math.round(trust.score)}
-            label="Trust Score"
-            color={trust.score >= 70 ? 'success' : trust.score >= 40 ? 'amber' : 'alert'}
-          />
+      )}
+
+      {/* Score Row - Only if not fallback */}
+      {!product.is_fallback && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="glass p-6 flex flex-col items-center justify-center">
+            <ScoreRing
+              value={Math.round((sentiment.overall_score + 1) / 2 * 100)}
+              label="Sentiment"
+              color={sentiment.overall_score > 0.2 ? 'success' : sentiment.overall_score < -0.2 ? 'alert' : 'amber'}
+            />
+          </div>
+          <div className="glass p-6 flex flex-col items-center justify-center">
+            <ScoreRing
+              value={Math.round(trust.score)}
+              label="Trust Score"
+              color={trust.score >= 70 ? 'success' : trust.score >= 40 ? 'amber' : 'alert'}
+            />
+          </div>
+          <div className="glass p-6 flex flex-col items-center justify-center">
+            <ScoreRing
+              value={Math.round(value_analysis.value_score)}
+              label="Value Score"
+              color={value_analysis.value_score >= 60 ? 'success' : value_analysis.value_score >= 40 ? 'amber' : 'alert'}
+            />
+          </div>
+          <div className="glass p-5 relative overflow-hidden flex flex-col items-center justify-center text-center">
+            <div className={clsx('absolute inset-0 opacity-10 bg-gradient-to-t', trust.risk_level === 'low' ? 'from-brand-success' : trust.risk_level === 'medium' ? 'from-amber-400' : 'from-brand-alert')}></div>
+            <div className={clsx('text-5xl font-extrabold z-10 drop-shadow-md', trust.risk_level === 'low' ? 'text-brand-success' : trust.risk_level === 'medium' ? 'text-amber-400' : 'text-brand-alert')}>
+              {trust.suspicious_count}
+            </div>
+            <div className="text-gray-400 text-sm font-medium z-10">Suspicious Reviews</div>
+            <span className={clsx('text-xs px-3 py-1 rounded-full font-bold z-10 border mt-2', `badge-${trust.risk_level}`)}>
+              {trust.risk_level.toUpperCase()} RISK
+            </span>
+          </div>
         </div>
+      )}
         <div className="glass p-6 flex flex-col items-center justify-center">
           <ScoreRing
             value={Math.round(value_analysis.value_score)}
@@ -167,7 +200,7 @@ export default function Results() {
           AI Analysis Summary
         </h2>
         <p className="text-gray-300 leading-relaxed mb-8 text-lg">{ai_summary.summary}</p>
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-3 gap-8">
           <div className="bg-brand-success/5 border border-brand-success/10 rounded-2xl p-5">
             <h3 className="font-bold text-brand-success flex items-center gap-2 mb-4 text-lg">
               <ThumbsUp className="w-5 h-5" /> Key Advantages
@@ -188,6 +221,18 @@ export default function Results() {
               {ai_summary.cons?.map((c, i) => (
                 <li key={i} className="flex gap-3 text-sm text-gray-200">
                   <span className="text-brand-alert font-bold mt-0.5">✗</span> {c}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5">
+            <h3 className="font-bold text-amber-500 flex items-center gap-2 mb-4 text-lg">
+              <AlertCircle className="w-5 h-5" /> Common Complaints
+            </h3>
+            <ul className="space-y-3 relative z-10">
+              {ai_summary.common_complaints?.map((c, i) => (
+                <li key={i} className="flex gap-3 text-sm text-gray-200">
+                  <span className="text-amber-500 font-bold mt-0.5">!</span> {c}
                 </li>
               ))}
             </ul>
@@ -215,27 +260,72 @@ export default function Results() {
         )}
       </div>
 
-      {/* Sentiment %% */}
-      <div className="grid md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        {[
-          { label: 'Positive', pct: sentiment.positive_pct, color: 'from-brand-success to-emerald-400', icon: ThumbsUp, textCol: 'text-brand-success' },
-          { label: 'Neutral',  pct: sentiment.neutral_pct,  color: 'from-amber-400 to-yellow-500',      icon: null,       textCol: 'text-amber-400' },
-          { label: 'Negative', pct: sentiment.negative_pct, color: 'from-brand-alert to-rose-400',      icon: ThumbsDown, textCol: 'text-brand-alert' },
-        ].map(({ label, pct, color, icon: Icon, textCol }) => (
-          <div key={label} className="glass p-5 border-t-2" style={{ borderTopColor: pct > 30 ? `var(--tw-colors-brand-${label === 'Positive' ? 'success' : label === 'Negative' ? 'alert' : 'amber'})` : 'transparent' }}>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-gray-400 text-sm font-medium uppercase tracking-wider">{label}</span>
-              <span className={clsx("font-extrabold text-2xl", textCol)}>{pct?.toFixed(1)}%</span>
+      {/* Sentiment %% - Only if not fallback */}
+      {!product.is_fallback && (
+        <div className="grid md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          {[
+            { label: 'Positive', pct: sentiment.positive_pct, color: 'from-brand-success to-emerald-400', icon: ThumbsUp, textCol: 'text-brand-success' },
+            { label: 'Neutral',  pct: sentiment.neutral_pct,  color: 'from-amber-400 to-yellow-500',      icon: null,       textCol: 'text-amber-400' },
+            { label: 'Negative', pct: sentiment.negative_pct, color: 'from-brand-alert to-rose-400',      icon: ThumbsDown, textCol: 'text-brand-alert' },
+          ].map(({ label, pct, color, icon: Icon, textCol }) => (
+            <div key={label} className="glass p-5 border-t-2" style={{ borderTopColor: pct > 30 ? `var(--tw-colors-brand-${label === 'Positive' ? 'success' : label === 'Negative' ? 'alert' : 'amber'})` : 'transparent' }}>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-gray-400 text-sm font-medium uppercase tracking-wider">{label}</span>
+                <span className={clsx("font-extrabold text-2xl", textCol)}>{pct?.toFixed(1)}%</span>
+              </div>
+              <div className="h-2.5 bg-brand-navy rounded-full overflow-hidden shadow-inner">
+                <div className={clsx('h-full bg-gradient-to-r rounded-full transition-all duration-1000', color)} style={{ width: `${pct}%` }} />
+              </div>
             </div>
-            <div className="h-2.5 bg-brand-navy rounded-full overflow-hidden shadow-inner">
-              <div className={clsx('h-full bg-gradient-to-r rounded-full transition-all duration-1000', color)} style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Charts Row */}
-      <div className="grid md:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+      {/* Competitors Matrix */}
+      {ai_summary.competitors && ai_summary.competitors.length > 0 && (
+        <div className="animate-slide-up" style={{ animationDelay: '0.35s' }}>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-3 text-white">
+            <div className="p-2 bg-gradient-to-br from-brand-lavender to-brand-cyan rounded-lg shadow-[0_0_10px_rgba(110,231,249,0.3)]">
+              <span className="text-xl text-brand-navy">⚖️</span>
+            </div>
+            Top Competitors & Alternatives
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {ai_summary.competitors.map((comp, idx) => (
+              <div key={idx} className="glass p-6 flex flex-col relative overflow-hidden group hover:border-brand-cyan/50 transition-colors">
+                <div className="absolute top-0 right-0 p-3">
+                  <span className="bg-brand-cyan/20 text-brand-cyan font-bold text-xs px-2 py-1 rounded-full border border-brand-cyan/30">Score: {comp.score}</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1 pr-16">{comp.name}</h3>
+                <div className="text-brand-cyan font-bold mb-4">{comp.price}</div>
+                
+                <div className="space-y-4 flex-1">
+                  <div>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Key Pros</span>
+                    <ul className="text-sm text-gray-300 space-y-1">
+                      {comp.pros?.slice(0,2).map((p,i) => <li key={i} className="flex gap-2"><span className="text-brand-success">✓</span>{p}</li>)}
+                    </ul>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Key Cons</span>
+                    <ul className="text-sm text-gray-300 space-y-1">
+                      {comp.cons?.slice(0,2).map((c,i) => <li key={i} className="flex gap-2"><span className="text-brand-alert">✗</span>{c}</li>)}
+                    </ul>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Best For</span>
+                  <p className="text-sm text-brand-lavender">{comp.best_for}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Charts Row - Only if not fallback */}
+      {!product.is_fallback && (
+        <div className="grid md:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.4s' }}>
         {/* Distribution Bar Chart */}
         {distData.length > 0 && (
           <div className="glass p-6">
@@ -270,9 +360,11 @@ export default function Results() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Individuals Reviews List */}
-      <div className="glass overflow-hidden animate-slide-up" style={{ animationDelay: '0.5s' }}>
+      {/* Individuals Reviews List - Only if not fallback */}
+      {!product.is_fallback && (
+        <div className="glass overflow-hidden animate-slide-up" style={{ animationDelay: '0.5s' }}>
         <div className="p-6 md:p-8 border-b border-white/5 flex items-center justify-between">
           <h2 className="text-xl font-bold flex items-center gap-2 text-white">
             <MessageSquare className="w-5 h-5 text-brand-cyan" />
@@ -353,6 +445,7 @@ export default function Results() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

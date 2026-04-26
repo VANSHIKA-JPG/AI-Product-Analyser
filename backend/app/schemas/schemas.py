@@ -81,6 +81,7 @@ class ProductSchema(BaseModel):
     image_url: Optional[str] = None
     category: Optional[str] = None
     scraped_at: Optional[datetime] = None
+    is_fallback: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -118,11 +119,13 @@ class AISummarySchema(BaseModel):
     summary: str
     pros: list[str] = []
     cons: list[str] = []
+    common_complaints: list[str] = []
     recommendation: str  # buy / skip / maybe
     recommendation_reason: str = ""
     key_insights: list[str] = []
     best_for: str = ""
     avoid_if: str = ""
+    competitors: list[dict] = []
 
 
 class ReviewSchema(BaseModel):
