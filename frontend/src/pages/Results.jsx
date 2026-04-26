@@ -172,24 +172,6 @@ export default function Results() {
           </div>
         </div>
       )}
-        <div className="glass p-6 flex flex-col items-center justify-center">
-          <ScoreRing
-            value={Math.round(value_analysis.value_score)}
-            label="Value Score"
-            color={value_analysis.value_score >= 70 ? 'success' : 'cyan'}
-          />
-        </div>
-        <div className="glass p-6 flex flex-col items-center justify-center gap-2 text-center relative overflow-hidden">
-          <div className={clsx('absolute inset-0 opacity-10 bg-gradient-to-t', trust.risk_level === 'low' ? 'from-brand-success' : trust.risk_level === 'medium' ? 'from-amber-400' : 'from-brand-alert')}></div>
-          <div className={clsx('text-5xl font-extrabold z-10 drop-shadow-md', trust.risk_level === 'low' ? 'text-brand-success' : trust.risk_level === 'medium' ? 'text-amber-400' : 'text-brand-alert')}>
-            {trust.suspicious_count}
-          </div>
-          <div className="text-gray-400 text-sm font-medium z-10">Suspicious Reviews</div>
-          <span className={clsx('text-xs px-3 py-1 rounded-full font-bold z-10 border', `badge-${trust.risk_level}`)}>
-            {trust.risk_level.toUpperCase()} RISK
-          </span>
-        </div>
-      </div>
 
       {/* AI Summary */}
       <div className="glass p-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
