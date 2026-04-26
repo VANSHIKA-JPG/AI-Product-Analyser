@@ -94,9 +94,9 @@ export default function Home() {
   const normalizeAmazonUrl = (raw) => {
     try {
       const u = new URL(raw)
-      const match = raw.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i)
-      if (match) return `https://${u.hostname}/dp/${match[1]}/`
-      return raw
+      u.search = '' // strip tracking query params
+      u.hash = '' // strip hash
+      return u.toString()
     } catch {
       return raw
     }

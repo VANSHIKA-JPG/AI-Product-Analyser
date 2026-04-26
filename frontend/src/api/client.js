@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BACKEND_URL = import.meta.env.VITE_API_BASE ?? 'https://ai-product-analyser-4.onrender.com/api'
+const BACKEND_URL = import.meta.env.VITE_API_BASE ?? '/api'
 
 const api = axios.create({
   baseURL: BACKEND_URL,
