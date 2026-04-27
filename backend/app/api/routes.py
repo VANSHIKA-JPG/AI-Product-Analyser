@@ -99,8 +99,13 @@ async def analyze_product(
         raise HTTPException(status_code=502, detail="Failed to scrape product info")
         
     is_fallback = product_info.get("is_fallback", False)
-    if not reviews_data and not is_fallback:
-        raise HTTPException(status_code=404, detail="No reviews found for this product")
+    
+    # If reviews are empty (due to CAPTCHA on the reviews page or actually 0 reviews),
+    # we force the AI Fallback mode instead of failing.
+    if not reviews_data:
+        logger.warning(f"No reviews found for {payload.url} — forcing AI Fallback Mode")
+        is_fallback = True
+        product_info["is_fallback"] = True
 
     logger.info(f"Scraped {len(reviews_data)} reviews — running VADER sentiment + fake detection")
 
@@ -116,6 +121,7 @@ async def analyze_product(
 
     if is_fallback or not reviews_data:
         vader_scores = []
+        total = 0
         pos_pct, neg_pct, neu_pct, overall_score = 0.0, 0.0, 0.0, 0.0
         dist = {"very_negative": 0, "negative": 0, "neutral": 0, "positive": 0, "very_positive": 0}
         
